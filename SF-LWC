@@ -1,0 +1,142 @@
+ import { LightningElement, track } from 'lwc';
+
+// import server side apex class method 
+import getContactList from '@salesforce/apex/TenantAssessmentV2.getContactList';
+// import standard toast event  
+import {ShowToastEvent} from 'lightning/platformShowToastEvent'
+
+export default class TenantAssessmentV2 extends LightningElement {
+
+    @track contacts;
+    searchValue = '';    
+ 
+    // update searchValue var when input field value change
+    searchKeyword(event) {
+        this.searchValue = event.target.value;
+        console.log('searchKey::>>'+this.searchValue);
+    }
+ 
+    // call apex method on button click 
+    handleSearchKeyword() {
+        console.log('enter handle search::>>');
+        if (this.searchValue !== '') {
+            getContactList({
+                    searchKey: this.searchValue
+                })
+                .then(result => {
+                    // set @track contacts variable with return contact list from server  
+                    this.contacts = result;
+                    console.log('contacts::>>'+JSON.stringify(this.contacts));
+                })
+                .catch(error => {
+                   
+                    const event = new ShowToastEvent({
+                        title: 'Error',
+                        variant: 'error',
+                        message: error.body.message,
+                    });
+                    this.dispatchEvent(event);
+                    // reset contacts var with null   
+                    this.contactsRecord = null;
+                });
+        } else {
+            // fire toast event if input field is blank
+            const event = new ShowToastEvent({
+                variant: 'error',
+                message: 'Search text missing..',
+            });
+            this.dispatchEvent(event);
+        }
+    }
+}
+<template>
+    <div class="slds-m-around_medium">
+      
+      <div class="slds-m-bottom_small slds-grid slds-wrap">
+          <lightning-input type="text"
+             value={searchValue}
+             label="Enter Location here"
+             onchange={searchKeyword} size="4"
+             ></lightning-input>
+       </div>
+       
+       <lightning-button label="Search"
+          onclick={handleSearchKeyword}
+          variant="brand"></lightning-button>
+          
+      
+       <table class="slds-table slds-table_cell-buffer slds-table_bordered slds-m-top_small">
+          <thead>
+             <tr class="slds-line-height_reset">
+                <th class="" scope="col">
+                   <div class="slds-truncate" title="First Name">First Name</div>
+                </th>
+                <th class="" scope="col">
+                   <div class="slds-truncate" title="Last Name">Last Name</div>
+                </th>
+                <th class="" scope="col">
+                   <div class="slds-truncate" title="Record Type Name">Record Type Name</div>
+                </th >
+                <th class="" scope="col">
+                  <div class="slds-truncate" title="Location">Location</div>
+               </th >
+                <th class="" scope="col">
+                   <div class="slds-truncate" title="Mobile Phone">Mobile Phone</div>
+                </th>
+                <th class="" scope="col">
+                   <div class="slds-truncate" title="Email">Email</div>
+                </th>
+             </tr>
+          </thead>
+          
+          <tbody>   
+             <template for:each={contacts} for:item="con">
+                <tr class="slds-hint-parent" key={con.Id}>
+                   <td>
+                      <div class="slds-truncate">{con.FirstName}</div>
+                   </td>
+                   <td>
+                      <div class="slds-truncate">{con.LastName}</div>
+                   </td>
+                   <td>
+                      <div class="slds-truncate">{con.RecordType.Name}</div>
+                   </td>
+                   <td>
+                      <div class="slds-truncate">{con.Location__c}</div> 
+                   </td>
+                   <td>
+                      <div class="slds-truncate">
+                         <lightning-formatted-phone value={con.MobilePhone} ></lightning-formatted-phone>
+                      </div>
+                   </td>
+                   <td>
+                      <div class="slds-truncate">
+                         <lightning-formatted-email value={con.Email} ></lightning-formatted-email>
+                      </div>
+                   </td>
+                </tr>
+             </template>
+          </tbody>
+       </table>
+    </div>
+ </template>
+
+<targets>
+       <target>lightning__AppPage</target>
+       <target>lightning__RecordPage</target>
+       <target>lightning__HomePage</target>
+       <target>lightning__Tab</target>
+   </targets>
+
+public with sharing class TenantAssessmentV2 {
+    
+    @AuraEnabled(cacheable=true)
+    public static List<Contact> getContactList(String searchKey){
+        String searchKeyWord = '%' + searchKey + '%';
+        List<Contact> conList = [SELECT Id, RecordType.Name, FirstName, LastName, Email,MobilePhone,Location__c FROM Contact 
+                                WHERE Location__c =: searchKey];
+
+        return conList;                                
+
+    }
+}
